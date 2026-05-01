@@ -83,6 +83,30 @@ Este documento traduz as propostas dos documentos de requisitos e rastreabilidad
 - Perfis e escopos são aplicados no backend
 - Eventos sensíveis ficam auditáveis
 
+#### Checklist de validacao
+
+Status atual: `praticamente concluida`
+
+Implementado:
+- [x] Dependencias de seguranca, AOP e JWT foram adicionadas no backend (`spring-boot-starter-security`, `spring-boot-starter-aop`, `jjwt-*`).
+- [x] Existe fluxo de autenticacao com login em `/auth/login`, emissao de JWT e filtro de autenticacao por bearer token.
+- [x] Existem perfis de acesso `ADMIN`, `OPERADOR` e `ANALISTA` com carregamento via `CustomUserDetailsService`.
+- [x] As rotas criticas principais estao protegidas no `SecurityConfig`, com separacao entre operacoes de `ADMIN` e `ADMIN/OPERADOR`.
+- [x] Existe cadastro e gestao de usuarios de acesso no backend (`UsuarioAcesso`) e frontend.
+- [x] O frontend ja possui tela de login, sessao local e helpers de autorizacao por perfil.
+- [x] Ha trilha de auditoria persistida em `RegistroAuditoria`.
+- [x] Login com sucesso, falha de login, acesso sem autenticacao e acesso negado geram eventos de auditoria.
+- [x] Acoes sensiveis em controllers principais estao anotadas com `@AuditableAction` e passam pelo aspecto de auditoria.
+- [x] O escopo de acesso do operador ja influencia o dominio de missao, restringindo leitura e operacao as missoes sob sua responsabilidade.
+- [x] A auditoria passou a ter consulta administrativa no backend via endpoint protegido para `ADMIN`.
+
+Falta para fechar a issue:
+- [ ] Criar testes automatizados cobrindo autenticacao, autorizacao por perfil e auditoria.
+- [ ] Definir e documentar a matriz completa de permissao por caso de uso critico para evitar lacunas de acesso apenas por regra de URL.
+- [ ] Endurecer configuracao para ambiente real: segredo JWT e usuarios seed estao em `application.properties`, o que nao fecha uma entrega segura de producao.
+- [ ] Decidir se o requisito final sera apenas JWT ou se ainda existe expectativa de OAuth2; hoje ha implementacao JWT, mas nao OAuth2.
+- [ ] Validar todas as integracoes externas e fluxos futuros criticos sob a mesma politica de seguranca, especialmente os itens ainda em aberto do backlog.
+
 ### ISSUE-06. FEATURE Tornar operador responsável obrigatório na missão
 
 - Tipo: `FEATURE`
@@ -96,6 +120,27 @@ Este documento traduz as propostas dos documentos de requisitos e rastreabilidad
 - Critério de aceite:
 - Criação e atualização de missão validam operador responsável
 - DTOs, domínio e frontend refletem a obrigatoriedade
+
+#### Checklist de validacao
+
+Status atual: `praticamente concluida`
+
+Implementado:
+- [x] `CriarMissaoRequest` e `AtualizarMissaoRequest` ja possuem o campo `operadorId`.
+- [x] `MissaoDTO` ja expõe `operadorResponsavel` e o `MissaoMapper` faz o mapeamento de ida e volta necessario.
+- [x] A criacao de missao por `ADMIN` falha sem operador responsavel definido no service.
+- [x] A criacao de missao por `OPERADOR` vincula automaticamente a missao ao operador associado ao usuario autenticado.
+- [x] O backend valida a existencia do operador informado antes de associar a missao.
+- [x] A atualizacao de missao permite trocar o operador responsavel e valida o novo operador informado.
+- [x] O repositorio e o service ja restringem leitura/listagem do operador apenas as missoes sob sua responsabilidade.
+- [x] O frontend de criacao/edicao de missao ja exige selecao de operador para administradores.
+- [x] O frontend ja exibe o operador responsavel na modelagem consumida pelo dashboard.
+- [x] A entidade `Missao` agora reforca a obrigatoriedade do operador responsavel tambem na persistencia.
+
+Falta para fechar a issue:
+- [ ] Criar migracao/garantia explicita de banco para bases ja existentes, caso haja registros legados com operador nulo.
+- [ ] Adicionar testes automatizados de criacao, atualizacao e regras por perfil para esse fluxo.
+- [ ] Atualizar a documentacao funcional e tecnica para registrar que o operador responsavel passou a ser obrigatorio e como a regra muda entre `ADMIN` e `OPERADOR`.
 
 ### ISSUE-07. FEATURE Integrar backend Java ao simulador Python com persistência rastreável
 

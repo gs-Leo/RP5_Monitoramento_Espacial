@@ -1,15 +1,36 @@
-// API Base URL - Update this to your backend URL
+import { clearStoredSession, loadStoredSession, type AuthSession } from "@/lib/auth"
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
-// Debug logging
-if (typeof window !== 'undefined') {
-  console.log('API_BASE_URL:', API_BASE_URL)
-  console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL)
+export interface LoginRequest {
+  username: string
+  senha: string
 }
 
-// ============================================
-// ASTRONAUT DTOs
-// ============================================
+export interface UsuarioAcessoDTO {
+  id: string
+  username: string
+  role: "ADMIN" | "OPERADOR" | "ANALISTA"
+  ativo: boolean
+  operadorMissaoId?: string | null
+  operadorMissaoNome?: string | null
+}
+
+export interface CriarUsuarioAcessoRequest {
+  username: string
+  senha: string
+  role: "ADMIN" | "OPERADOR" | "ANALISTA"
+  ativo: boolean
+  operadorMissaoId?: number
+}
+
+export interface AtualizarUsuarioAcessoRequest {
+  role: "ADMIN" | "OPERADOR" | "ANALISTA"
+  ativo: boolean
+  novaSenha?: string
+  operadorMissaoId?: number
+}
+
 export interface AstronautDTO {
   id: string
   nome: string
@@ -29,15 +50,11 @@ export interface CreateAstronautRequest {
   ativo: boolean
   nivelAptidaoMedica: "ALTO" | "MEDIO" | "BAIXO"
   missoesRealizadas: number
-  // Campos opcionais
   tipoBiometria?: string
   valorBiometria?: string
   unidadeBiometria?: string
 }
 
-// ============================================
-// SPACESHIP DTOs
-// ============================================
 export interface EspaconaveDTO {
   id: string
   nome: string
@@ -51,16 +68,13 @@ export interface SalvarEspaconaveRequest {
   statusOperacional: "OPERACIONAL" | "EM_MANUTENCAO" | "DESATIVADA"
 }
 
-// ============================================
-// OPERATOR DTOs
-// ============================================
 export interface OperadorDeMissaoDTO {
   id: string
   nome: string
   idade: number
   turno: string
-  areaEspecializacao: string 
-  ativo: boolean             
+  areaEspecializacao: string
+  ativo: boolean
 }
 
 export interface CriarOperadorRequest {
@@ -71,9 +85,6 @@ export interface CriarOperadorRequest {
   ativo: boolean
 }
 
-// ============================================
-// MISSION DTOs
-// ============================================
 export interface MissaoDTO {
   id: string
   nome: string
@@ -82,12 +93,9 @@ export interface MissaoDTO {
   dataFim?: string
   status: "PLANEJADA" | "EM_ANDAMENTO" | "CONCLUIDA" | "FALHOU"
   tipoSimulacao?: "foguete" | "orbita" | "reentrada"
-  
-  // Tripulação como objetos completos
-  tripulacao: AstronautDTO[] 
-  
-  // CORREÇÃO: Espaçonave pode vir preenchida ou nula
-  espaconave?: EspaconaveDTO 
+  tripulacao: AstronautDTO[]
+  espaconave?: EspaconaveDTO
+  operadorResponsavel?: OperadorDeMissaoDTO
 }
 
 export interface CriarMissaoRequest {
@@ -95,15 +103,11 @@ export interface CriarMissaoRequest {
   objetivo: string
   dataInicio: string
   tipoSimulacao?: "foguete" | "orbita" | "reentrada"
-  tripulacaoIds: number[] 
-  
-  // CORREÇÃO: ID da nave para salvar
-  espaconaveId?: number 
+  tripulacaoIds: number[]
+  espaconaveId?: number
+  operadorId?: number
 }
 
-// ============================================
-// EVENT & PROTOCOL DTOs
-// ============================================
 export interface EventoDTO {
   id: string
   missaoId: string
@@ -125,289 +129,256 @@ export interface AcionarProtocoloRequest {
   descricao: string
 }
 
-// ============================================
-// API CLIENT CLASSES
-// ============================================
+async function parseError(response: Response) {
+  try {
+    const data = await response.json()
+    return data?.message || data?.error || `Erro HTTP ${response.status}`
+  } catch {
+    const text = await response.text()
+    return text || `Erro HTTP ${response.status}`
+  }
+}
 
-export class AstronautAPI {
-  static async listar(): Promise<AstronautDTO[]> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/astronautas`)
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`[${response.status}] ${response.statusText}:`, errorText)
-        throw new Error(`Failed to fetch astronauts: ${response.status}`)
-      }
-      return response.json()
-    } catch (error) {
-      console.error("Error fetching astronauts:", error)
-      throw error
-    }
+function getSessionToken() {
+  return loadStoredSession()?.token
+}
+
+async function apiFetch(path: string, init?: RequestInit, authenticated = true) {
+  const headers = new Headers(init?.headers || {})
+
+  if (!headers.has("Content-Type") && init?.body) {
+    headers.set("Content-Type", "application/json")
   }
 
-  static async buscarPorId(id: string): Promise<AstronautDTO> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/astronautas/${id}`)
-      if (!response.ok) throw new Error(`Failed to fetch astronaut: ${response.status}`)
-      return response.json()
-    } catch (error) {
-      console.error("Error fetching astronaut:", error)
-      throw error
+  if (authenticated) {
+    const token = getSessionToken()
+    if (!token) {
+      throw new Error("Sessao expirada. Faca login novamente.")
     }
+    headers.set("Authorization", `Bearer ${token}`)
   }
 
-  static async criar(data: CreateAstronautRequest): Promise<AstronautDTO> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/astronautas`, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+  })
+
+  if (response.status === 401) {
+    clearStoredSession()
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response))
+  }
+
+  return response
+}
+
+export class AuthAPI {
+  static async login(data: LoginRequest): Promise<AuthSession> {
+    const response = await apiFetch(
+      "/auth/login",
+      {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-      })
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText)
-      }
-      return response.json()
-    } catch (error) {
-      console.error("Error creating astronaut:", error)
-      throw error
-    }
+      },
+      false,
+    )
+
+    return response.json()
+  }
+}
+
+export class UserAccessAPI {
+  static async listar(): Promise<UsuarioAcessoDTO[]> {
+    const response = await apiFetch("/usuarios-acesso")
+    return response.json()
   }
 
-  static async atualizar(id: string, data: CreateAstronautRequest): Promise<AstronautDTO> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/astronautas/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      })
-      if (!response.ok) throw new Error(`Failed to update astronaut: ${response.status}`)
-      return response.json()
-    } catch (error) {
-      console.error("Error updating astronaut:", error)
-      throw error
-    }
+  static async criar(data: CriarUsuarioAcessoRequest): Promise<UsuarioAcessoDTO> {
+    const response = await apiFetch("/usuarios-acesso", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+    return response.json()
+  }
+
+  static async atualizar(id: string, data: AtualizarUsuarioAcessoRequest): Promise<UsuarioAcessoDTO> {
+    const response = await apiFetch(`/usuarios-acesso/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+    return response.json()
   }
 
   static async deletar(id: string): Promise<void> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/astronautas/${id}`, {
-        method: "DELETE",
-      })
-      if (!response.ok) throw new Error(`Failed to delete astronaut: ${response.status}`)
-    } catch (error) {
-      console.error("Error deleting astronaut:", error)
-      throw error
-    }
+    await apiFetch(`/usuarios-acesso/${id}`, {
+      method: "DELETE",
+    })
+  }
+}
+
+export class AstronautAPI {
+  static async listar(): Promise<AstronautDTO[]> {
+    const response = await apiFetch("/astronautas")
+    return response.json()
+  }
+
+  static async buscarPorId(id: string): Promise<AstronautDTO> {
+    const response = await apiFetch(`/astronautas/${id}`)
+    return response.json()
+  }
+
+  static async criar(data: CreateAstronautRequest): Promise<AstronautDTO> {
+    const response = await apiFetch("/astronautas", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+    return response.json()
+  }
+
+  static async atualizar(id: string, data: CreateAstronautRequest): Promise<AstronautDTO> {
+    const response = await apiFetch(`/astronautas/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+    return response.json()
+  }
+
+  static async deletar(id: string): Promise<void> {
+    await apiFetch(`/astronautas/${id}`, {
+      method: "DELETE",
+    })
   }
 }
 
 export class SpaceshipAPI {
   static async listar(): Promise<EspaconaveDTO[]> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/espaconaves`)
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`[${response.status}] ${response.statusText}:`, errorText)
-        throw new Error(`Failed to fetch spaceships: ${response.status}`)
-      }
-      return response.json()
-    } catch (error) {
-      console.error("Error fetching spaceships:", error)
-      throw error
-    }
+    const response = await apiFetch("/espaconaves")
+    return response.json()
   }
 
   static async buscarPorId(id: string): Promise<EspaconaveDTO> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/espaconaves/${id}`)
-      if (!response.ok) throw new Error(`Failed to fetch spaceship: ${response.status}`)
-      return response.json()
-    } catch (error) {
-      console.error("Error fetching spaceship:", error)
-      throw error
-    }
+    const response = await apiFetch(`/espaconaves/${id}`)
+    return response.json()
   }
 
   static async criar(data: SalvarEspaconaveRequest): Promise<EspaconaveDTO> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/espaconaves`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      })
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText)
-      }
-      return response.json()
-    } catch (error) {
-      console.error("Error creating spaceship:", error)
-      throw error
-    }
+    const response = await apiFetch("/espaconaves", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+    return response.json()
   }
 
   static async atualizar(id: string, data: SalvarEspaconaveRequest): Promise<EspaconaveDTO> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/espaconaves/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      })
-      if (!response.ok) throw new Error(`Failed to update spaceship: ${response.status}`)
-      return response.json()
-    } catch (error) {
-      console.error("Error updating spaceship:", error)
-      throw error
-    }
+    const response = await apiFetch(`/espaconaves/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+    return response.json()
   }
 
   static async deletar(id: string): Promise<void> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/espaconaves/${id}`, {
-        method: "DELETE",
-      })
-      if (!response.ok) throw new Error(`Failed to delete spaceship: ${response.status}`)
-    } catch (error) {
-      console.error("Error deleting spaceship:", error)
-      throw error
-    }
+    await apiFetch(`/espaconaves/${id}`, {
+      method: "DELETE",
+    })
   }
 }
 
 export class OperatorAPI {
   static async listar(): Promise<OperadorDeMissaoDTO[]> {
-    const response = await fetch(`${API_BASE_URL}/operadores`)
-    if (!response.ok) throw new Error("Failed to fetch operators")
+    const response = await apiFetch("/operadores")
     return response.json()
   }
 
   static async buscarPorId(id: string): Promise<OperadorDeMissaoDTO> {
-    const response = await fetch(`${API_BASE_URL}/operadores/${id}`)
-    if (!response.ok) throw new Error("Failed to fetch operator")
+    const response = await apiFetch(`/operadores/${id}`)
     return response.json()
   }
 
   static async criar(data: CriarOperadorRequest): Promise<OperadorDeMissaoDTO> {
-    const response = await fetch(`${API_BASE_URL}/operadores`, {
+    const response = await apiFetch("/operadores", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     })
-    if (!response.ok) throw new Error("Failed to create operator")
     return response.json()
   }
 
   static async atualizar(id: string, data: CriarOperadorRequest): Promise<OperadorDeMissaoDTO> {
-    const response = await fetch(`${API_BASE_URL}/operadores/${id}`, {
+    const response = await apiFetch(`/operadores/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     })
-    if (!response.ok) throw new Error("Failed to update operator")
     return response.json()
   }
 
   static async deletar(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/operadores/${id}`, {
+    await apiFetch(`/operadores/${id}`, {
       method: "DELETE",
     })
-    if (!response.ok) throw new Error("Failed to delete operator")
   }
 }
 
 export class MissionAPI {
   static async listar(): Promise<MissaoDTO[]> {
-    try {
-      console.log(`Fetching missions from: ${API_BASE_URL}/missoes`)
-      const response = await fetch(`${API_BASE_URL}/missoes`)
-      console.log(`Response status: ${response.status}`)
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`[${response.status}] ${response.statusText}:`, errorText)
-        throw new Error(`Failed to fetch missions: ${response.status} ${response.statusText}`)
-      }
-      const data = await response.json()
-      console.log('Missions fetched successfully:', data)
-      return data
-    } catch (error: any) {
-      console.error("Error fetching missions:", error)
-      console.error("Error message:", error?.message)
-      console.error("Error type:", error?.name)
-      throw error
-    }
+    const response = await apiFetch("/missoes")
+    return response.json()
   }
 
   static async buscarPorId(id: string): Promise<MissaoDTO> {
-    const response = await fetch(`${API_BASE_URL}/missoes/${id}`)
-    if (!response.ok) throw new Error("Failed to fetch mission")
+    const response = await apiFetch(`/missoes/${id}`)
     return response.json()
   }
 
   static async criar(data: CriarMissaoRequest): Promise<MissaoDTO> {
-    const response = await fetch(`${API_BASE_URL}/missoes`, {
+    const response = await apiFetch("/missoes", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(errorText) 
-    }
-
     return response.json()
   }
 
-  static async atualizar(id: string, data: any): Promise<MissaoDTO> {
-    const response = await fetch(`${API_BASE_URL}/missoes/${id}`, {
+  static async atualizar(id: string, data: CriarMissaoRequest): Promise<MissaoDTO> {
+    const response = await apiFetch(`/missoes/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     })
-    if (!response.ok) throw new Error("Failed to update mission")
     return response.json()
   }
 
   static async concluir(id: string): Promise<MissaoDTO> {
-    const response = await fetch(`${API_BASE_URL}/missoes/${id}/concluir`, {
+    const response = await apiFetch(`/missoes/${id}/concluir`, {
       method: "POST",
     })
-    if (!response.ok) throw new Error("Failed to complete mission")
     return response.json()
   }
 
   static async deletar(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/missoes/${id}`, {
+    await apiFetch(`/missoes/${id}`, {
       method: "DELETE",
     })
-    if (!response.ok) throw new Error("Failed to delete mission")
   }
 }
 
 export class EventAPI {
   static async listarPorMissao(missaoId: string): Promise<EventoDTO[]> {
-    const response = await fetch(`${API_BASE_URL}/missoes/${missaoId}/eventos`)
-    if (!response.ok) throw new Error("Failed to fetch events")
+    const response = await apiFetch(`/missoes/${missaoId}/eventos`)
     return response.json()
   }
 }
 
 export class ProtocolAPI {
   static async listarPorMissao(missaoId: string): Promise<ProtocoloEmergencialDTO[]> {
-    const response = await fetch(`${API_BASE_URL}/missoes/${missaoId}/protocolos`)
-    if (!response.ok) throw new Error("Failed to fetch protocols")
+    const response = await apiFetch(`/missoes/${missaoId}/protocolos`)
     return response.json()
   }
 
   static async acionar(missaoId: string, data: AcionarProtocoloRequest): Promise<ProtocoloEmergencialDTO> {
-    const response = await fetch(`${API_BASE_URL}/missoes/${missaoId}/protocolos`, {
+    const response = await apiFetch(`/missoes/${missaoId}/protocolos`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     })
-    if (!response.ok) throw new Error("Failed to activate protocol")
     return response.json()
   }
 }

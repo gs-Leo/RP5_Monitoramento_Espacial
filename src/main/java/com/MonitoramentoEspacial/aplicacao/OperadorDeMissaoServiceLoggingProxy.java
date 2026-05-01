@@ -23,7 +23,7 @@ public class OperadorDeMissaoServiceLoggingProxy implements OperadorDeMissaoServ
 
     @Override
     public OperadorDeMissaoDTO criarOperador(CriarOperadorRequest request) {
-        log.info("PROXY: Requisição para criar operador: {}", request.getNome());
+        log.info("PROXY: Requisicao para criar operador: {}", request.getNome());
         try {
             OperadorDeMissaoDTO dto = realOperadorService.criarOperador(request);
             log.info("PROXY: Operador '{}' (ID: {}) criado.", dto.getNome(), dto.getId());
@@ -35,8 +35,21 @@ public class OperadorDeMissaoServiceLoggingProxy implements OperadorDeMissaoServ
     }
 
     @Override
+    public OperadorDeMissaoDTO atualizarOperador(Long id, CriarOperadorRequest request) {
+        log.info("PROXY: Requisicao para atualizar operador ID: {}", id);
+        try {
+            OperadorDeMissaoDTO dto = realOperadorService.atualizarOperador(id, request);
+            log.info("PROXY: Operador '{}' (ID: {}) atualizado.", dto.getNome(), dto.getId());
+            return dto;
+        } catch (Exception e) {
+            log.error("PROXY: Erro ao atualizar operador ID {}: {}", id, e.getMessage());
+            throw e;
+        }
+    }
+
+    @Override
     public OperadorDeMissaoDTO buscarPorId(Long id) {
-        log.info("PROXY: Requisição para buscar operador ID: {}", id);
+        log.info("PROXY: Requisicao para buscar operador ID: {}", id);
         try {
             OperadorDeMissaoDTO dto = realOperadorService.buscarPorId(id);
             log.info("PROXY: Operador encontrado: {}", dto.getNome());
@@ -49,7 +62,7 @@ public class OperadorDeMissaoServiceLoggingProxy implements OperadorDeMissaoServ
 
     @Override
     public List<OperadorDeMissaoDTO> listarOperadores(String nome) {
-        log.info("PROXY: Requisição para listar operadores (filtro: '{}')", nome);
+        log.info("PROXY: Requisicao para listar operadores (filtro: '{}')", nome);
         List<OperadorDeMissaoDTO> lista = realOperadorService.listarOperadores(nome);
         log.info("PROXY: {} operadores encontrados.", lista.size());
         return lista;
@@ -57,7 +70,7 @@ public class OperadorDeMissaoServiceLoggingProxy implements OperadorDeMissaoServ
 
     @Override
     public void deletarOperador(Long id) {
-        log.info("PROXY: Requisição para deletar operador ID: {}", id);
+        log.info("PROXY: Requisicao para deletar operador ID: {}", id);
         try {
             realOperadorService.deletarOperador(id);
             log.info("PROXY: Operador ID {} deletado.", id);

@@ -1,28 +1,37 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useAuth } from "@/components/auth-provider"
 import { MissionCard } from "@/components/mission-card"
 import { NewMissionSheet } from "@/components/new-mission-sheet"
-import { MissionAPI, type MissaoDTO } from "@/lib/api"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
+import { MissionAPI, type MissaoDTO } from "@/lib/api"
 
 export function MissionsDashboard() {
   const [isSheetOpen, setIsSheetOpen] = useState(false)
   const [missions, setMissions] = useState<MissaoDTO[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [editingMission, setEditingMission] = useState<MissaoDTO | null>(null) // Estado para edição
+  const [editingMission, setEditingMission] = useState<MissaoDTO | null>(null)
   const { toast } = useToast()
+  const { hasRole } = useAuth()
+
+  const canCreateMission = hasRole("ADMIN", "OPERADOR")
+  const canManageMissions = hasRole("ADMIN")
 
   const fetchMissions = async () => {
     try {
       setIsLoading(true)
       const data = await MissionAPI.listar()
       setMissions(data)
-    } catch (error) {
-      console.error("Erro ao buscar missões:", error)
+    } catch (error: any) {
+      toast({
+        title: "Erro ao carregar",
+        description: error?.message || "Nao foi possivel buscar as missoes.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -32,27 +41,31 @@ export function MissionsDashboard() {
     fetchMissions()
   }, [])
 
-  // --- FUNÇÃO DE DELETAR (CORREÇÃO DO ERRO) ---
   const handleDeleteMission = async (id: string) => {
     try {
       await MissionAPI.deletar(id)
-      toast({ title: "Missão removida", description: "A missão foi excluída com sucesso." })
-      // Atualiza a lista visualmente
+      toast({ title: "Missao removida", description: "A missao foi excluida com sucesso." })
       setMissions((prev) => prev.filter((m) => m.id !== id))
-    } catch (error) {
-      toast({ title: "Erro", description: "Não foi possível remover a missão.", variant: "destructive" })
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error?.message || "Nao foi possivel remover a missao.",
+        variant: "destructive",
+      })
     }
   }
 
-  // --- FUNÇÃO DE EDITAR ---
   const handleEditMission = (mission: MissaoDTO) => {
-    setEditingMission(mission) // Salva a missão no estado
-    setIsSheetOpen(true)       // Abre o modal
+    if (!canManageMissions) {
+      return
+    }
+    setEditingMission(mission)
+    setIsSheetOpen(true)
   }
 
   const handleSheetOpenChange = (open: boolean) => {
     setIsSheetOpen(open)
-    if (!open) setEditingMission(null) // Limpa a edição ao fechar
+    if (!open) setEditingMission(null)
   }
 
   const filterMissions = (status?: string) => {
@@ -63,43 +76,61 @@ export function MissionsDashboard() {
   const mapToCardProps = (m: MissaoDTO) => ({
     id: m.id,
     name: m.nome,
-    destination: "Espaço Profundo",
+    destination: "Espaco Profundo",
     launchDate: m.dataInicio,
     status: m.status,
     description: m.objetivo,
+    operatorName: m.operadorResponsavel?.nome,
   })
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight" data-testid="dashboard-title">Dashboard de Missões</h1>
-        <Button onClick={() => setIsSheetOpen(true)} data-testid="btn-new-mission">
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Missão
-        </Button>
+        <h1 className="text-3xl font-bold tracking-tight" data-testid="dashboard-title">
+          Dashboard de Missoes
+        </h1>
+        {canCreateMission ? (
+          <Button onClick={() => setIsSheetOpen(true)} data-testid="btn-new-mission">
+            <Plus className="mr-2 h-4 w-4" />
+            Nova Missao
+          </Button>
+        ) : null}
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="overview" data-testid="tab-overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="PLANEJADA" data-testid="tab-planejada">Planejadas</TabsTrigger>
-          <TabsTrigger value="EM_ANDAMENTO" data-testid="tab-em-andamento">Em Andamento</TabsTrigger>
-          <TabsTrigger value="CONCLUIDA" data-testid="tab-concluida">Concluídas</TabsTrigger>
+          <TabsTrigger value="overview" data-testid="tab-overview">
+            Visao Geral
+          </TabsTrigger>
+          <TabsTrigger value="PLANEJADA" data-testid="tab-planejada">
+            Planejadas
+          </TabsTrigger>
+          <TabsTrigger value="EM_ANDAMENTO" data-testid="tab-em-andamento">
+            Em Andamento
+          </TabsTrigger>
+          <TabsTrigger value="CONCLUIDA" data-testid="tab-concluida">
+            Concluidas
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
           {isLoading ? (
-            <div className="text-center py-10 text-muted-foreground" data-testid="loading-state">Carregando...</div>
+            <div className="py-10 text-center text-muted-foreground" data-testid="loading-state">
+              Carregando...
+            </div>
           ) : missions.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground" data-testid="empty-state">Nenhuma missão encontrada.</div>
+            <div className="py-10 text-center text-muted-foreground" data-testid="empty-state">
+              Nenhuma missao encontrada.
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="missions-grid">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" data-testid="missions-grid">
               {missions.map((mission) => (
-                <MissionCard 
-                    key={mission.id} 
-                    mission={mapToCardProps(mission)}
-                    onDelete={handleDeleteMission}
-                    onEdit={() => handleEditMission(mission)} 
+                <MissionCard
+                  key={mission.id}
+                  mission={mapToCardProps(mission)}
+                  onDelete={handleDeleteMission}
+                  onEdit={() => handleEditMission(mission)}
+                  canManage={canManageMissions}
                 />
               ))}
             </div>
@@ -108,13 +139,14 @@ export function MissionsDashboard() {
 
         {["PLANEJADA", "EM_ANDAMENTO", "CONCLUIDA"].map((status) => (
           <TabsContent key={status} value={status} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {filterMissions(status).map((mission) => (
-                <MissionCard 
-                    key={mission.id} 
-                    mission={mapToCardProps(mission)} 
-                    onDelete={handleDeleteMission}
-                    onEdit={() => handleEditMission(mission)}
+                <MissionCard
+                  key={mission.id}
+                  mission={mapToCardProps(mission)}
+                  onDelete={handleDeleteMission}
+                  onEdit={() => handleEditMission(mission)}
+                  canManage={canManageMissions}
                 />
               ))}
             </div>
@@ -122,11 +154,11 @@ export function MissionsDashboard() {
         ))}
       </Tabs>
 
-      <NewMissionSheet 
-        open={isSheetOpen} 
+      <NewMissionSheet
+        open={isSheetOpen}
         onOpenChange={handleSheetOpenChange}
         onSuccess={fetchMissions}
-        mission={editingMission} 
+        mission={editingMission}
       />
     </div>
   )

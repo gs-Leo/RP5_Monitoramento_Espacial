@@ -1,95 +1,114 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { CalendarIcon, Check, ChevronsUpDown, Rocket } from "lucide-react"
+import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { CalendarIcon, Check, ChevronsUpDown, Rocket } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { cn } from "@/lib/utils"
-import { 
-  MissionAPI, 
-  AstronautAPI, 
-  SpaceshipAPI, // <--- IMPORTADO
-  type CriarMissaoRequest, 
-  type AstronautDTO, 
-  type MissaoDTO,
-  type EspaconaveDTO // <--- IMPORTADO
-} from "@/lib/api"
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
+import {
+  AstronautAPI,
+  MissionAPI,
+  OperatorAPI,
+  SpaceshipAPI,
+  type AstronautDTO,
+  type CriarMissaoRequest,
+  type EspaconaveDTO,
+  type MissaoDTO,
+  type OperadorDeMissaoDTO,
+} from "@/lib/api"
+import { cn } from "@/lib/utils"
 
 interface NewMissionSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess?: () => void
-  mission?: MissaoDTO | null 
+  mission?: MissaoDTO | null
 }
 
+const DEFAULT_SIMULATION_TYPE = "foguete" as const
+const NO_OPERATOR_VALUE = "__none__"
+
 export function NewMissionSheet({ open, onOpenChange, onSuccess, mission }: NewMissionSheetProps) {
+  const { hasRole } = useAuth()
+  const { toast } = useToast()
   const [nome, setNome] = useState("")
   const [objetivo, setObjetivo] = useState("")
   const [dataInicio, setDataInicio] = useState<Date>()
-  const [tipoSimulacao, setTipoSimulacao] = useState("foguete") // NOVO: Default foguete
-  
-  // Estados da Tripulação
+  const [tipoSimulacao, setTipoSimulacao] = useState<"foguete" | "orbita" | "reentrada">(DEFAULT_SIMULATION_TYPE)
   const [crewOpen, setCrewOpen] = useState(false)
-  const [selectedCrew, setSelectedCrew] = useState<string[]>([]) 
+  const [selectedCrew, setSelectedCrew] = useState<string[]>([])
   const [astronauts, setAstronauts] = useState<AstronautDTO[]>([])
-
-  // Estados da Espaçonave (NOVO)
-  const [selectedSpaceship, setSelectedSpaceship] = useState<string>("")
+  const [selectedSpaceship, setSelectedSpaceship] = useState("")
   const [spaceships, setSpaceships] = useState<EspaconaveDTO[]>([])
-
+  const [operators, setOperators] = useState<OperadorDeMissaoDTO[]>([])
+  const [selectedOperator, setSelectedOperator] = useState(NO_OPERATOR_VALUE)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { toast } = useToast()
+  const [errors, setErrors] = useState<Partial<Record<"nome" | "objetivo" | "dataInicio" | "espaconave" | "operador", string>>>({})
 
-  // Carrega Astronautas e Espaçonaves ao abrir
+  const isAdmin = hasRole("ADMIN")
+
   useEffect(() => {
-    if (open) {
-      AstronautAPI.listar()
-        .then(setAstronauts)
-        .catch(() => console.error("Erro ao carregar astronautas"))
-      
-      // Carrega as naves para o Select
-      SpaceshipAPI.listar()
-        .then(setSpaceships)
-        .catch(() => console.error("Erro ao carregar espaçonaves"))
+    if (!open) {
+      return
     }
-  }, [open])
 
-  // Lógica de Edição (Popula o form)
+    AstronautAPI.listar()
+      .then(setAstronauts)
+      .catch(() => console.error("Erro ao carregar astronautas"))
+
+    SpaceshipAPI.listar()
+      .then(setSpaceships)
+      .catch(() => console.error("Erro ao carregar espaconaves"))
+
+    if (isAdmin) {
+      OperatorAPI.listar()
+        .then(setOperators)
+        .catch(() => console.error("Erro ao carregar operadores"))
+    }
+  }, [open, isAdmin])
+
   useEffect(() => {
-    if (mission && open) {
-        setNome(mission.nome)
-        setObjetivo(mission.objetivo)
-        setTipoSimulacao(mission.tipoSimulacao || "foguete")
-        if (mission.dataInicio) {
-            const [ano, mes, dia] = mission.dataInicio.split('-').map(Number);
-            setDataInicio(new Date(ano, mes - 1, dia)); 
-        }
-        if (mission.tripulacao) {
-            setSelectedCrew(mission.tripulacao.map(a => a.id.toString()))
-        }
-        // Se o DTO da missão trouxer a espaçonave (depende do seu backend mapper), preenche aqui
-        // Assumindo que mission possa ter uma propriedade 'espaconave' ou similar no futuro
-        // Por enquanto, deixamos em branco ou tentamos ler de uma propriedade dinâmica se existir
-        if ((mission as any).espaconave?.id) {
-            setSelectedSpaceship((mission as any).espaconave.id.toString())
-        }
-    } else if (!mission && open) {
-        setNome("")
-        setObjetivo("")
+    if (!open) {
+      return
+    }
+
+    setErrors({})
+
+    if (mission) {
+      setNome(mission.nome)
+      setObjetivo(mission.objetivo)
+      setTipoSimulacao(mission.tipoSimulacao || DEFAULT_SIMULATION_TYPE)
+      setSelectedCrew(mission.tripulacao?.map((astronaut) => astronaut.id.toString()) ?? [])
+      setSelectedSpaceship(mission.espaconave?.id?.toString() ?? "")
+      setSelectedOperator(mission.operadorResponsavel?.id?.toString() ?? NO_OPERATOR_VALUE)
+
+      if (mission.dataInicio) {
+        const [ano, mes, dia] = mission.dataInicio.split("-").map(Number)
+        setDataInicio(new Date(ano, mes - 1, dia))
+      } else {
         setDataInicio(undefined)
-        setSelectedCrew([])
-        setSelectedSpaceship("")
-        setTipoSimulacao("foguete")
+      }
+      return
     }
+
+    setNome("")
+    setObjetivo("")
+    setDataInicio(undefined)
+    setSelectedCrew([])
+    setSelectedSpaceship("")
+    setSelectedOperator(NO_OPERATOR_VALUE)
+    setTipoSimulacao(DEFAULT_SIMULATION_TYPE)
+    setErrors({})
   }, [mission, open])
 
   const toggleCrew = (astronautId: string) => {
@@ -98,46 +117,78 @@ export function NewMissionSheet({ open, onOpenChange, onSuccess, mission }: NewM
     )
   }
 
-  const handleSubmit = async () => {
-    // Validação
-    if (!nome || !objetivo || !dataInicio) {
-      toast({ title: "Erro", description: "Preencha todos os campos obrigatórios.", variant: "destructive" })
-      return
+  const validate = () => {
+    const nextErrors: Partial<Record<"nome" | "objetivo" | "dataInicio" | "espaconave" | "operador", string>> = {}
+
+    if (!nome.trim()) {
+      nextErrors.nome = "Informe o nome da missao."
+    }
+
+    if (!objetivo.trim()) {
+      nextErrors.objetivo = "Informe o objetivo da missao."
+    }
+
+    if (!dataInicio) {
+      nextErrors.dataInicio = "Informe a data de inicio."
     }
 
     if (!selectedSpaceship) {
-        toast({ title: "Falta Espaçonave", description: "Selecione uma espaçonave para a missão.", variant: "destructive" })
-        return
+      nextErrors.espaconave = "Selecione uma espaconave para a missao."
+    }
+
+    if (isAdmin && selectedOperator === NO_OPERATOR_VALUE) {
+      nextErrors.operador = "Selecione o operador responsavel pela missao."
+    }
+
+    setErrors(nextErrors)
+
+    if (Object.keys(nextErrors).length > 0) {
+      toast({
+        title: "Campos obrigatorios",
+        description: "Preencha os campos destacados para salvar a missao.",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    return true
+  }
+
+  const buildPayload = (): CriarMissaoRequest => ({
+    nome: nome.trim(),
+    objetivo: objetivo.trim(),
+    dataInicio: format(dataInicio!, "yyyy-MM-dd"),
+    tipoSimulacao,
+    tripulacaoIds: selectedCrew.map((id) => Number(id)),
+    espaconaveId: Number(selectedSpaceship),
+    operadorId: isAdmin && selectedOperator !== NO_OPERATOR_VALUE ? Number(selectedOperator) : undefined,
+  })
+
+  const handleSubmit = async () => {
+    if (!validate()) {
+      return
     }
 
     setIsSubmitting(true)
     try {
-      const dataFormatada = format(dataInicio, "yyyy-MM-dd")
-      const tripulacaoNumerica = selectedCrew.map((id) => Number(id))
-
-      // Payload com espaçonave e tipoSimulacao
-      const payload = {
-        nome,
-        objetivo,
-        dataInicio: dataFormatada,
-        tipoSimulacao,
-        tripulacaoIds: tripulacaoNumerica,
-        espaconaveId: Number(selectedSpaceship) // <--- ENVIO DO ID
-      }
+      const payload = buildPayload()
 
       if (mission) {
-         await MissionAPI.atualizar(mission.id, payload)
-         toast({ title: "Sucesso", description: "Missão atualizada!" })
+        await MissionAPI.atualizar(mission.id, payload)
+        toast({ title: "Sucesso", description: "Missao atualizada." })
       } else {
-         // @ts-ignore
-         await MissionAPI.criar(payload)
-         toast({ title: "Sucesso", description: "Missão criada!" })
+        await MissionAPI.criar(payload)
+        toast({ title: "Sucesso", description: "Missao criada." })
       }
 
       onOpenChange(false)
       onSuccess?.()
     } catch (error: any) {
-      toast({ title: "Erro", description: error.message || "Falha ao salvar missão.", variant: "destructive" })
+      toast({
+        title: "Erro",
+        description: error.message || "Falha ao salvar missao.",
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -145,89 +196,179 @@ export function NewMissionSheet({ open, onOpenChange, onSuccess, mission }: NewM
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      {/* CORREÇÃO VISUAL 1: Aumentei para 640px e removi padding padrão para controlar manualmente */}
-      <SheetContent className="sm:max-w-[640px] w-full p-0 overflow-y-auto">
-        
-        {/* Header com Padding */}
-        <SheetHeader className="px-6 py-6 border-b border-border">
-          <SheetTitle>{mission ? "Editar Missão" : "Criar Nova Missão"}</SheetTitle>
-          <SheetDescription>Preencha os detalhes da missão.</SheetDescription>
+      <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-[640px]">
+        <SheetHeader className="border-b border-border px-6 py-6">
+          <SheetTitle>{mission ? "Editar Missao" : "Criar Nova Missao"}</SheetTitle>
+          <SheetDescription>
+            {isAdmin
+              ? "Defina a missao e escolha quem sera o operador responsavel."
+              : "As missoes criadas por voce ficam vinculadas automaticamente ao seu operador."}
+          </SheetDescription>
         </SheetHeader>
 
-        {/* CORREÇÃO VISUAL 2: Padding interno (px-6) no container do form */}
         <div className="grid gap-6 px-6 py-6">
           <div className="grid gap-2">
-            <Label htmlFor="nome">Nome da Missão</Label>
-            <Input data-testid="input-mission-name" id="nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Missão Marte I" />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="objetivo">Objetivo</Label>
-            <Input data-testid="input-mission-objective" id="objetivo" value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Ex: Estabelecer base avançada" />
+            <Label htmlFor="nome">Nome da Missao</Label>
+            <Input
+              id="nome"
+              data-testid="input-mission-name"
+              value={nome}
+              onChange={(event) => {
+                setNome(event.target.value)
+                setErrors((current) => ({ ...current, nome: undefined }))
+              }}
+              placeholder="Ex: Missao Marte I"
+              aria-invalid={!!errors.nome}
+            />
+            {errors.nome ? <p className="text-sm text-destructive">{errors.nome}</p> : null}
           </div>
 
           <div className="grid gap-2">
-            <Label>Tipo de Simulação</Label>
-            <Select value={tipoSimulacao} onValueChange={setTipoSimulacao}>
+            <Label htmlFor="objetivo">Objetivo</Label>
+            <Textarea
+              id="objetivo"
+              data-testid="input-mission-objective"
+              value={objetivo}
+              onChange={(event) => {
+                setObjetivo(event.target.value)
+                setErrors((current) => ({ ...current, objetivo: undefined }))
+              }}
+              placeholder="Ex: Estabelecer base avancada"
+              rows={4}
+              aria-invalid={!!errors.objetivo}
+            />
+            {errors.objetivo ? <p className="text-sm text-destructive">{errors.objetivo}</p> : null}
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Tipo de Simulacao</Label>
+            <Select
+              value={tipoSimulacao}
+              onValueChange={(value) => setTipoSimulacao(value as "foguete" | "orbita" | "reentrada")}
+            >
               <SelectTrigger data-testid="select-simulation-type" className="w-full">
                 <SelectValue placeholder="Selecione o tipo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="foguete">Foguete - Lançamento</SelectItem>
-                <SelectItem value="orbita">Órbita - Orbital</SelectItem>
-                <SelectItem value="reentrada">Reentrada - Atmosférica</SelectItem>
+                <SelectItem value="foguete">Foguete - Lancamento</SelectItem>
+                <SelectItem value="orbita">Orbita - Orbital</SelectItem>
+                <SelectItem value="reentrada">Reentrada - Atmosferica</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          
-          <div className="grid grid-cols-2 gap-4">
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="grid gap-2">
-                <Label>Data de Início</Label>
-                <Popover>
+              <Label>Data de Inicio</Label>
+              <Popover>
                 <PopoverTrigger asChild>
-                    <Button data-testid="btn-calendar-trigger" variant="outline" className={cn("justify-start text-left font-normal w-full", !dataInicio && "text-muted-foreground")}>
+                  <Button
+                    data-testid="btn-calendar-trigger"
+                    variant="outline"
+                    className={cn(
+                      "justify-start text-left font-normal",
+                      !dataInicio && "text-muted-foreground",
+                      errors.dataInicio && "border-destructive text-destructive",
+                    )}
+                    aria-invalid={!!errors.dataInicio}
+                  >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dataInicio ? format(dataInicio, "PPP", { locale: ptBR }) : "Selecione"}
-                    </Button>
+                  </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={dataInicio} onSelect={setDataInicio} initialFocus />
+                  <Calendar
+                    mode="single"
+                    selected={dataInicio}
+                    onSelect={(date) => {
+                      setDataInicio(date)
+                      setErrors((current) => ({ ...current, dataInicio: undefined }))
+                    }}
+                    initialFocus
+                  />
                 </PopoverContent>
-                </Popover>
+              </Popover>
+              {errors.dataInicio ? <p className="text-sm text-destructive">{errors.dataInicio}</p> : null}
             </div>
 
-            {/* CAMPO DE ESPAÇONAVE ADICIONADO */}
             <div className="grid gap-2">
-                <Label>Espaçonave</Label>
-                <Select value={selectedSpaceship} onValueChange={setSelectedSpaceship}>
-                    <SelectTrigger data-testid="select-mission-spaceship" className="w-full">
-                        <SelectValue placeholder="Selecione a nave" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {spaceships.map((ship) => (
-                            <SelectItem 
-                                key={ship.id} 
-                                value={ship.id.toString()}
-                                disabled={ship.statusOperacional !== "OPERACIONAL"}
-                                data-testid={`option-spaceship-${ship.id}`}
-                            >
-                                <span className="flex items-center gap-2">
-                                    <Rocket className="h-4 w-4" />
-                                    {ship.nome}
-                                    {ship.statusOperacional !== "OPERACIONAL" && " (Indisp.)"}
-                                </span>
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+              <Label>Espaconave</Label>
+              <Select
+                value={selectedSpaceship}
+                onValueChange={(value) => {
+                  setSelectedSpaceship(value)
+                  setErrors((current) => ({ ...current, espaconave: undefined }))
+                }}
+              >
+                <SelectTrigger
+                  data-testid="select-mission-spaceship"
+                  className={cn("w-full", errors.espaconave && "border-destructive")}
+                  aria-invalid={!!errors.espaconave}
+                >
+                  <SelectValue placeholder="Selecione a nave" />
+                </SelectTrigger>
+                <SelectContent>
+                  {spaceships.map((ship) => (
+                    <SelectItem
+                      key={ship.id}
+                      value={ship.id.toString()}
+                      disabled={ship.statusOperacional !== "OPERACIONAL"}
+                      data-testid={`option-spaceship-${ship.id}`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Rocket className="h-4 w-4" />
+                        {ship.nome}
+                        {ship.statusOperacional !== "OPERACIONAL" ? " (Indisp.)" : ""}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.espaconave ? <p className="text-sm text-destructive">{errors.espaconave}</p> : null}
             </div>
           </div>
 
+          {isAdmin ? (
+            <div className="grid gap-2">
+              <Label>Operador Responsavel</Label>
+              <Select
+                value={selectedOperator}
+                onValueChange={(value) => {
+                  setSelectedOperator(value)
+                  setErrors((current) => ({ ...current, operador: undefined }))
+                }}
+              >
+                <SelectTrigger className={cn("w-full", errors.operador && "border-destructive")} aria-invalid={!!errors.operador}>
+                  <SelectValue placeholder="Selecione o operador responsavel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_OPERATOR_VALUE}>Selecione um operador</SelectItem>
+                  {operators.map((operator) => (
+                    <SelectItem key={operator.id} value={operator.id.toString()}>
+                      {operator.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.operador ? <p className="text-sm text-destructive">{errors.operador}</p> : null}
+              <p className="text-xs text-muted-foreground">
+                Esse operador passara a visualizar e operar essa missao no perfil OPERADOR.
+              </p>
+            </div>
+          ) : null}
+
           <div className="grid gap-2">
-            <Label>Tripulação ({selectedCrew.length} selecionados)</Label>
+            <Label>Tripulacao ({selectedCrew.length} selecionados)</Label>
             <Popover open={crewOpen} onOpenChange={setCrewOpen}>
               <PopoverTrigger asChild>
-                <Button data-testid="btn-crew-combobox" variant="outline" role="combobox" aria-expanded={crewOpen} className="justify-between bg-transparent w-full">
-                  {selectedCrew.length > 0 ? `${selectedCrew.length} astronauta(s)` : "Selecionar Tripulação"}
+                <Button
+                  data-testid="btn-crew-combobox"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={crewOpen}
+                  className="w-full justify-between bg-transparent"
+                >
+                  {selectedCrew.length > 0 ? `${selectedCrew.length} astronauta(s)` : "Selecionar tripulacao"}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -239,10 +380,17 @@ export function NewMissionSheet({ open, onOpenChange, onSuccess, mission }: NewM
                     <CommandGroup>
                       {astronauts.map((astronaut) => (
                         <CommandItem key={astronaut.id} onSelect={() => toggleCrew(astronaut.id.toString())}>
-                          <Check className={cn("mr-2 h-4 w-4", selectedCrew.includes(astronaut.id.toString()) ? "opacity-100" : "opacity-0")} />
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedCrew.includes(astronaut.id.toString()) ? "opacity-100" : "opacity-0",
+                            )}
+                          />
                           <div className="flex flex-col">
-                             <span>{astronaut.nome}</span>
-                             <span className="text-xs text-muted-foreground">{astronaut.nivelAptidaoMedica} • {astronaut.ativo ? "Ativo" : "Inativo"}</span>
+                            <span>{astronaut.nome}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {astronaut.nivelAptidaoMedica} • {astronaut.ativo ? "Ativo" : "Inativo"}
+                            </span>
                           </div>
                         </CommandItem>
                       ))}
@@ -254,10 +402,13 @@ export function NewMissionSheet({ open, onOpenChange, onSuccess, mission }: NewM
           </div>
         </div>
 
-        {/* Footer com Padding */}
-        <SheetFooter className="px-6 py-4 border-t border-border mt-auto">
-          <Button data-testid="btn-save-mission" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? "Salvando..." : "Salvar"}</Button>
+        <SheetFooter className="mt-auto border-t border-border px-6 py-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? "Salvando..." : "Salvar"}
+          </Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

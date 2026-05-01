@@ -1,15 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import { Rocket, MoreHorizontal } from "lucide-react"
+import { MoreHorizontal, Rocket } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
+import { AddSpaceshipDialog } from "@/components/add-spaceship-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { AddSpaceshipDialog } from "@/components/add-spaceship-dialog"
 import { useSpaceships } from "@/hooks/useSpaceships"
-import { SpaceshipAPI, type EspaconaveDTO } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { SpaceshipAPI, type EspaconaveDTO } from "@/lib/api"
 
 const getStatusBadgeColor = (status: string) => {
   switch (status) {
@@ -29,7 +30,7 @@ const getStatusLabel = (status: string) => {
     case "OPERACIONAL":
       return "Operacional"
     case "EM_MANUTENCAO":
-      return "Em Manutenção"
+      return "Em Manutencao"
     case "DESATIVADA":
       return "Desativada"
     default:
@@ -42,8 +43,14 @@ export function SpaceshipsManagement() {
   const [editingSpaceship, setEditingSpaceship] = useState<EspaconaveDTO | null>(null)
   const { spaceships, isLoading, mutate } = useSpaceships()
   const { toast } = useToast()
+  const { hasRole } = useAuth()
+
+  const canManage = hasRole("ADMIN")
 
   const handleEdit = (spaceship: EspaconaveDTO) => {
+    if (!canManage) {
+      return
+    }
     setEditingSpaceship(spaceship)
     setIsDialogOpen(true)
   }
@@ -52,14 +59,11 @@ export function SpaceshipsManagement() {
     try {
       await SpaceshipAPI.deletar(id)
       mutate()
-      toast({
-        title: "Espaçonave removida",
-        description: "A espaçonave foi removida com sucesso.",
-      })
-    } catch (error) {
+      toast({ title: "Espaconave removida", description: "A espaconave foi removida com sucesso." })
+    } catch (error: any) {
       toast({
         title: "Erro ao remover",
-        description: "Não foi possível remover a espaçonave.",
+        description: error?.message || "Nao foi possivel remover a espaconave.",
         variant: "destructive",
       })
     }
@@ -72,25 +76,24 @@ export function SpaceshipsManagement() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground">Carregando espaçonaves...</p>
+      <div className="flex min-h-[400px] items-center justify-center">
+        <p className="text-muted-foreground">Carregando espaconaves...</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Gerenciamento de Espaçonaves</h1>
-        <Button onClick={() => setIsDialogOpen(true)}
-          data-testid="btn-add-spaceship" >
-          <Rocket className="mr-2 h-4 w-4" />
-          Adicionar Espaçonave
-        </Button>
+        <h1 className="text-3xl font-bold tracking-tight">Gerenciamento de Espaconaves</h1>
+        {canManage ? (
+          <Button onClick={() => setIsDialogOpen(true)} data-testid="btn-add-spaceship">
+            <Rocket className="mr-2 h-4 w-4" />
+            Adicionar Espaconave
+          </Button>
+        ) : null}
       </div>
 
-      {/* Table */}
       <div className="rounded-lg border border-border bg-card">
         <Table>
           <TableHeader>
@@ -98,7 +101,7 @@ export function SpaceshipsManagement() {
               <TableHead>Nome</TableHead>
               <TableHead>Capacidade</TableHead>
               <TableHead>Status Operacional</TableHead>
-              <TableHead className="w-[70px]">Ações</TableHead>
+              <TableHead className="w-[70px]">Acoes</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -113,26 +116,28 @@ export function SpaceshipsManagement() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(spaceship)}>Editar</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(spaceship.id)}>
-                          Remover
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {canManage ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(spaceship)}>Editar</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(spaceship.id)}>
+                            Remover
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                  Nenhuma espaçonave cadastrada
+                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                  Nenhuma espaconave cadastrada
                 </TableCell>
               </TableRow>
             )}
@@ -140,12 +145,7 @@ export function SpaceshipsManagement() {
         </Table>
       </div>
 
-      <AddSpaceshipDialog
-        open={isDialogOpen}
-        onOpenChange={handleDialogClose}
-        spaceship={editingSpaceship}
-        onSuccess={mutate}
-      />
+      <AddSpaceshipDialog open={isDialogOpen} onOpenChange={handleDialogClose} spaceship={editingSpaceship} onSuccess={mutate} />
     </div>
   )
 }

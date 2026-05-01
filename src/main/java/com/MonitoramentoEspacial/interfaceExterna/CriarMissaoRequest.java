@@ -3,42 +3,85 @@ package com.MonitoramentoEspacial.interfaceExterna;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+
 import java.time.LocalDate;
 import java.util.List;
 
 public class CriarMissaoRequest {
 
-    @NotBlank(message = "O nome da missão é obrigatório")
+    @NotBlank(message = "O nome da missao e obrigatorio")
     private String nome;
 
-    @NotBlank(message = "O objetivo é obrigatório")
+    @NotBlank(message = "O objetivo e obrigatorio")
     private String objetivo;
 
-    @NotNull(message = "A data de início é obrigatória")
+    @NotNull(message = "A data de inicio e obrigatoria")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate dataInicio;
 
     private String tipoSimulacao;
     private List<Long> tripulacaoIds;
     private Long espaconaveId;
-    public Long getEspaconaveId() { return espaconaveId; }
-    public void setEspaconaveId(Long espaconaveId) { this.espaconaveId = espaconaveId; }
+    // Obrigatorio para ADMIN; para OPERADOR o backend vincula automaticamente
+    // o operador associado ao usuario autenticado.
+    private Long operadorId;
 
     public CriarMissaoRequest() {
     }
 
-    public String getNome() { return nome; }
-    public void setNome(String nome) { this.nome = nome; }
+    public String getNome() {
+        return nome;
+    }
 
-    public String getObjetivo() { return objetivo; }
-    public void setObjetivo(String objetivo) { this.objetivo = objetivo; }
+    public void setNome(String nome) {
+        this.nome = nome;
+    }
 
-    public LocalDate getDataInicio() { return dataInicio; }
-    public void setDataInicio(LocalDate dataInicio) { this.dataInicio = dataInicio; }
+    public String getObjetivo() {
+        return objetivo;
+    }
 
-    public String getTipoSimulacao() { return tipoSimulacao; }
-    public void setTipoSimulacao(String tipoSimulacao) { this.tipoSimulacao = tipoSimulacao; }
+    public void setObjetivo(String objetivo) {
+        this.objetivo = objetivo;
+    }
 
-    public List<Long> getTripulacaoIds() { return tripulacaoIds; }
-    public void setTripulacaoIds(List<Long> tripulacaoIds) { this.tripulacaoIds = tripulacaoIds; }
+    public LocalDate getDataInicio() {
+        return dataInicio;
+    }
+
+    public void setDataInicio(LocalDate dataInicio) {
+        this.dataInicio = dataInicio;
+    }
+
+    public String getTipoSimulacao() {
+        return tipoSimulacao;
+    }
+
+    public void setTipoSimulacao(String tipoSimulacao) {
+        this.tipoSimulacao = tipoSimulacao;
+    }
+
+    public List<Long> getTripulacaoIds() {
+        return tripulacaoIds;
+    }
+
+    public void setTripulacaoIds(List<Long> tripulacaoIds) {
+        this.tripulacaoIds = tripulacaoIds;
+    }
+
+    public Long getEspaconaveId() {
+        return espaconaveId;
+    }
+
+    public void setEspaconaveId(Long espaconaveId) {
+        this.espaconaveId = espaconaveId;
+    }
+
+    public Long getOperadorId() {
+        return operadorId;
+    }
+
+    public void setOperadorId(Long operadorId) {
+        this.operadorId = operadorId;
+    }
 }

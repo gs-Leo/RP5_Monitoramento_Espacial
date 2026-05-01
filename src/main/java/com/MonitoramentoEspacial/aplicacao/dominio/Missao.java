@@ -1,6 +1,7 @@
 package com.MonitoramentoEspacial.aplicacao.dominio;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,8 +45,9 @@ public class Missao {
      * NOVO: Relacionamento com OperadorDeMissao.
      * Muitas missões podem ser gerenciadas por um operador.
      */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "operador_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "operador_id", nullable = false)
+    @NotNull(message = "Toda missao precisa de um operador responsavel.")
     private OperadorDeMissao operadorResponsavel;
 
     /**
@@ -94,6 +96,14 @@ public class Missao {
 
     // Construtor vazio para JPA
     public Missao() {}
+
+    @PrePersist
+    @PreUpdate
+    private void validarIntegridade() {
+        if (operadorResponsavel == null) {
+            throw new IllegalStateException("Toda missao precisa de um operador responsavel.");
+        }
+    }
 
 
     // ----------------------------------------------------
