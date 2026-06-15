@@ -89,7 +89,7 @@ export default function LoginPage() {
           </form>
 
           <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-300">
-            Usuarios iniciais: admin/admin123, operador/operador123, analista/analista123
+            Usuarios iniciais configurados por ambiente.
           </div>
         </CardContent>
       </Card>

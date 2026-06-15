@@ -21,6 +21,7 @@ import com.MonitoramentoEspacial.middleware.OperadorDeMissaoRepository;
 import com.MonitoramentoEspacial.middleware.ProtocoloEmergencialRepository;
 import com.MonitoramentoEspacial.middleware.UsuarioAcessoRepository;
 import com.MonitoramentoEspacial.security.AppUserPrincipal;
+import com.MonitoramentoEspacial.simulador.SimuladorClient;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -45,6 +46,7 @@ public class MissaoService implements MissaoServiceInterface {
     private final MissaoMapper missaoMapper;
     private final EventoMapper eventoMapper;
     private final ProtocoloEmergencialMapper protocoloMapper;
+    private final SimuladorClient simuladorClient;
 
     public MissaoService(
             MissaoRepository missaoRepository,
@@ -56,7 +58,8 @@ public class MissaoService implements MissaoServiceInterface {
             ProtocoloEmergencialRepository protocoloRepository,
             MissaoMapper missaoMapper,
             EventoMapper eventoMapper,
-            ProtocoloEmergencialMapper protocoloMapper
+            ProtocoloEmergencialMapper protocoloMapper,
+            SimuladorClient simuladorClient
     ) {
         this.missaoRepository = missaoRepository;
         this.astronautaRepository = astronautaRepository;
@@ -68,6 +71,7 @@ public class MissaoService implements MissaoServiceInterface {
         this.missaoMapper = missaoMapper;
         this.eventoMapper = eventoMapper;
         this.protocoloMapper = protocoloMapper;
+        this.simuladorClient = simuladorClient;
     }
 
     private Missao getMissaoById(Long missaoId) {
@@ -287,6 +291,9 @@ public class MissaoService implements MissaoServiceInterface {
     public MissaoDTO iniciarSimulacao(Long id) {
         Missao missao = getAccessibleMissaoById(id);
         missao.iniciarSimulacao();
+        if (simuladorClient.isEnabled()) {
+            simuladorClient.iniciarSimulacao(missao);
+        }
         return missaoMapper.toDTO(missaoRepository.save(missao));
     }
 

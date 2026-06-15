@@ -5,3 +5,7 @@
 /out
 git# Ignora todos os arquivos .class em qualquer pasta
 *.class
+.env
+/openspec
+/docs
+/.codex

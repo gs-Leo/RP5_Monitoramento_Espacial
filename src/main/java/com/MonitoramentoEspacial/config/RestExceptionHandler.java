@@ -2,6 +2,7 @@ package com.MonitoramentoEspacial.config;
 
 import com.MonitoramentoEspacial.aplicacao.RecursoNaoEncontradoException;
 import com.MonitoramentoEspacial.interfaceExterna.ApiErrorResponse;
+import com.MonitoramentoEspacial.simulador.SimuladorClientException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -53,6 +54,18 @@ public class RestExceptionHandler {
         );
 
         return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(SimuladorClientException.class)
+    public ResponseEntity<ApiErrorResponse> handleSimuladorClient(SimuladorClientException ex) {
+        ApiErrorResponse errorResponse = new ApiErrorResponse(
+                HttpStatus.BAD_GATEWAY.value(),
+                "Erro no Simulador",
+                ex.getMessage(),
+                Instant.now()
+        );
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_GATEWAY);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
