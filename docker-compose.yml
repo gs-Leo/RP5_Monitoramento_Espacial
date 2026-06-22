@@ -15,6 +15,14 @@ services:
     depends_on:
       - db
 
+  simulador:
+    build: ./simulacao-python
+    container_name: monitoramento-simulador
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+
   db:
     image: postgres:16-alpine
     container_name: monitoramento-db

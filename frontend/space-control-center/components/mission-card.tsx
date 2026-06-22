@@ -1,0 +1,92 @@
+"use client"
+
+import { useState } from "react"
+import { MoreVertical, Play, Calendar, X } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { SimulationFullscreen } from "@/components/SimulationFullscreen"
+
+interface Mission {
+  id: string
+  name: string
+  destination: string
+  launchDate: string
+  status: string 
+  description: string
+}
+
+// Configuração segura com todas as cores
+const statusConfig: Record<string, { variant: "default" | "secondary" | "outline" | "destructive"; className: string; label: string }> = {
+  "PLANEJADA": { variant: "default", className: "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20", label: "Planejada" },
+  "EM_ANDAMENTO": { variant: "secondary", className: "bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20", label: "Em Andamento" },
+  "CONCLUIDA": { variant: "outline", className: "bg-green-500/10 text-green-500 hover:bg-green-500/20", label: "Concluída" },
+  "FALHOU": { variant: "destructive", className: "bg-red-500/10 text-red-500 hover:bg-red-500/20", label: "Falhou" },
+}
+
+interface MissionCardProps {
+    mission: Mission
+    onDelete: (id: string) => void
+    onEdit?: () => void
+}
+
+export function MissionCard({ mission, onDelete, onEdit }: MissionCardProps) {
+  const [isSimulationOpen, setIsSimulationOpen] = useState(false)
+
+  // FALLBACK SEGURO: Se o status não existir no mapa, usa cinza
+  const statusStyle = statusConfig[mission.status] || { 
+      variant: "outline", 
+      className: "bg-gray-500/10 text-gray-500 border-gray-200", 
+      label: mission.status 
+  }
+
+  return (
+    <>
+      <Card className="flex flex-col h-full">
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-xl">{mission.name}</CardTitle>
+              <CardDescription>{mission.destination}</CardDescription>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onEdit}>Editar</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsSimulationOpen(true)}>Ver Simulação</DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive cursor-pointer" onClick={() => onDelete(mission.id)}>
+                    Excluir
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardHeader>
+        <CardContent className="flex-1 space-y-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Calendar className="h-4 w-4" /><span>Lançamento: {mission.launchDate}</span>
+          </div>
+          <Badge variant={statusStyle.variant} className={statusStyle.className}>{statusStyle.label}</Badge>
+          <p className="text-sm text-muted-foreground">{mission.description}</p>
+        </CardContent>
+        <CardFooter>
+          <Button className="w-full" onClick={() => setIsSimulationOpen(true)} disabled={mission.status === "CONCLUIDA"}>
+            <Play className="mr-2 h-4 w-4" /> Iniciar Simulação
+          </Button>
+        </CardFooter>
+      </Card>
+
+      <Dialog open={isSimulationOpen} onOpenChange={setIsSimulationOpen}>
+        <DialogContent className="max-w-full max-h-full w-screen h-screen p-0 border-0 bg-black overflow-hidden" style={{width: '100vw', height: '100vh', maxWidth: 'none', maxHeight: 'none'}}>
+            <DialogHeader className="sr-only">
+              <DialogTitle>Simulação: {mission.name}</DialogTitle>
+            </DialogHeader>
+            <SimulationFullscreen mission={mission} />
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
