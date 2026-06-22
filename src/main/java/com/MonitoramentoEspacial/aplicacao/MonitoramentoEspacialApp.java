@@ -2,10 +2,12 @@ package com.MonitoramentoEspacial.aplicacao;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 
 @SpringBootApplication(scanBasePackages = "com.MonitoramentoEspacial")
+@ConfigurationPropertiesScan(basePackages = "com.MonitoramentoEspacial")
 @EnableJpaRepositories(basePackages = "com.MonitoramentoEspacial.middleware")
 @EntityScan(basePackages = "com.MonitoramentoEspacial.aplicacao.dominio")
 public class MonitoramentoEspacialApp {

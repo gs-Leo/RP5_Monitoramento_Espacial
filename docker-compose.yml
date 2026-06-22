@@ -1,41 +1,62 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: monitoramento-espacial-postgres
+    env_file:
+      - .env
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-monitoramento_espacial}"
+      POSTGRES_USER: "${POSTGRES_USER:-monitoramento}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-monitoramento_local_password}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   app:
     build: .
     container_name: monitoramento-espacial-app
-    ports:
-      - "8080:8080"
     env_file:
       - .env
-    environment:
-      SPRING_PROFILES_ACTIVE: "prod"
-      SPRING_DATASOURCE_URL: "${SPRING_DATASOURCE_URL}"
-      SPRING_DATASOURCE_USERNAME: "${SPRING_DATASOURCE_USERNAME}"
-      SPRING_DATASOURCE_PASSWORD: "${SPRING_DATASOURCE_PASSWORD}"
-      SPRING_JPA_HIBERNATE_DDL_AUTO: "${SPRING_JPA_HIBERNATE_DDL_AUTO}"
     depends_on:
-      - db
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:-local}"
+      APP_DATASOURCE_PROVIDER: "${APP_DATASOURCE_PROVIDER:-local-postgres}"
+      SPRING_DATASOURCE_URL: "${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/monitoramento_espacial}"
+      SPRING_DATASOURCE_USERNAME: "${SPRING_DATASOURCE_USERNAME:-monitoramento}"
+      SPRING_DATASOURCE_PASSWORD: "${SPRING_DATASOURCE_PASSWORD:-monitoramento_local_password}"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "${SPRING_JPA_HIBERNATE_DDL_AUTO:-update}"
+      SPRING_JPA_SHOW_SQL: "${SPRING_JPA_SHOW_SQL:-true}"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: "${SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:-org.hibernate.dialect.PostgreSQLDialect}"
+      APP_SECURITY_JWT_SECRET: "${APP_SECURITY_JWT_SECRET:-local-development-jwt-secret-32-chars-minimum}"
+      APP_SECURITY_SEED_ADMIN_USERNAME: "${APP_SECURITY_SEED_ADMIN_USERNAME:-admin}"
+      APP_SECURITY_SEED_ADMIN_PASSWORD: "${APP_SECURITY_SEED_ADMIN_PASSWORD:-admin_local_password}"
+      APP_SECURITY_SEED_OPERADOR_USERNAME: "${APP_SECURITY_SEED_OPERADOR_USERNAME:-operador}"
+      APP_SECURITY_SEED_OPERADOR_PASSWORD: "${APP_SECURITY_SEED_OPERADOR_PASSWORD:-operador_local_password}"
+      APP_SECURITY_SEED_ANALISTA_USERNAME: "${APP_SECURITY_SEED_ANALISTA_USERNAME:-analista}"
+      APP_SECURITY_SEED_ANALISTA_PASSWORD: "${APP_SECURITY_SEED_ANALISTA_PASSWORD:-analista_local_password}"
+      SIMULATOR_API_ENABLED: "${SIMULATOR_API_ENABLED:-false}"
+      SIMULATOR_API_URL: "${SIMULATOR_API_URL:-http://python-simulator:8000}"
+      SIMULATOR_API_CONNECT_TIMEOUT_MS: "${SIMULATOR_API_CONNECT_TIMEOUT_MS:-2000}"
+      SIMULATOR_API_READ_TIMEOUT_MS: "${SIMULATOR_API_READ_TIMEOUT_MS:-30000}"
 
-  simulador:
+  python-simulator:
     build: ./simulacao-python
-    container_name: monitoramento-simulador
+    container_name: python-simulator
     ports:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
-
-  db:
-    image: postgres:16-alpine
-    container_name: monitoramento-db
-    env_file:
-      - .env
-    environment:
-      POSTGRES_DB: "${POSTGRES_DB}"
-      POSTGRES_USER: "${POSTGRES_USER}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
-    ports:
-      - "5433:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
 
 volumes:
-  pgdata:
+  postgres-data:

@@ -10,18 +10,61 @@ public class AtualizarMissaoRequest {
     private LocalDate dataFim;
     private List<Long> tripulacaoIds;
     private Long espaconaveId;
-    public Long getEspaconaveId() { return espaconaveId; }
-    public void setEspaconaveId(Long espaconaveId) { this.espaconaveId = espaconaveId; }
+    private Long operadorId;
 
-    // Getters e Setters
-    public String getNome() { return nome; }
-    public void setNome(String nome) { this.nome = nome; }
-    public String getObjetivo() { return objetivo; }
-    public void setObjetivo(String objetivo) { this.objetivo = objetivo; }
-    public LocalDate getDataInicio() { return dataInicio; }
-    public void setDataInicio(LocalDate dataInicio) { this.dataInicio = dataInicio; }
-    public LocalDate getDataFim() { return dataFim; }
-    public void setDataFim(LocalDate dataFim) { this.dataFim = dataFim; }
-    public List<Long> getTripulacaoIds() { return tripulacaoIds; }
-    public void setTripulacaoIds(List<Long> tripulacaoIds) { this.tripulacaoIds = tripulacaoIds; }
+    public String getNome() {
+        return nome;
+    }
+
+    public void setNome(String nome) {
+        this.nome = nome;
+    }
+
+    public String getObjetivo() {
+        return objetivo;
+    }
+
+    public void setObjetivo(String objetivo) {
+        this.objetivo = objetivo;
+    }
+
+    public LocalDate getDataInicio() {
+        return dataInicio;
+    }
+
+    public void setDataInicio(LocalDate dataInicio) {
+        this.dataInicio = dataInicio;
+    }
+
+    public LocalDate getDataFim() {
+        return dataFim;
+    }
+
+    public void setDataFim(LocalDate dataFim) {
+        this.dataFim = dataFim;
+    }
+
+    public List<Long> getTripulacaoIds() {
+        return tripulacaoIds;
+    }
+
+    public void setTripulacaoIds(List<Long> tripulacaoIds) {
+        this.tripulacaoIds = tripulacaoIds;
+    }
+
+    public Long getEspaconaveId() {
+        return espaconaveId;
+    }
+
+    public void setEspaconaveId(Long espaconaveId) {
+        this.espaconaveId = espaconaveId;
+    }
+
+    public Long getOperadorId() {
+        return operadorId;
+    }
+
+    public void setOperadorId(Long operadorId) {
+        this.operadorId = operadorId;
+    }
 }

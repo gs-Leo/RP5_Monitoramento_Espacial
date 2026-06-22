@@ -1,7 +1,8 @@
 package com.MonitoramentoEspacial.interfaceExterna;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.MonitoramentoEspacial.aplicacao.dominio.StatusMissao;
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -20,13 +21,23 @@ public class MissaoDTO {
     private StatusMissao status;
     private List<AstronautaDTO> tripulacao;
     private String tipoSimulacao;
-    
-    // CAMPO ADICIONADO
-    private EspaconaveDTO espaconave; 
+    private EspaconaveDTO espaconave;
+    private OperadorDeMissaoDTO operadorResponsavel;
 
     public MissaoDTO() {}
 
-    public MissaoDTO(Long id, String nome, String objetivo, LocalDate dataInicio, LocalDate dataFim, StatusMissao status, List<AstronautaDTO> tripulacao, EspaconaveDTO espaconave, String tipoSimulacao) {
+    public MissaoDTO(
+            Long id,
+            String nome,
+            String objetivo,
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            StatusMissao status,
+            List<AstronautaDTO> tripulacao,
+            EspaconaveDTO espaconave,
+            OperadorDeMissaoDTO operadorResponsavel,
+            String tipoSimulacao
+    ) {
         this.id = id;
         this.nome = nome;
         this.objetivo = objetivo;
@@ -35,10 +46,10 @@ public class MissaoDTO {
         this.status = status;
         this.tripulacao = tripulacao;
         this.espaconave = espaconave;
+        this.operadorResponsavel = operadorResponsavel;
         this.tipoSimulacao = tipoSimulacao;
     }
 
-    // Getters e Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getNome() { return nome; }
@@ -53,10 +64,10 @@ public class MissaoDTO {
     public void setStatus(StatusMissao status) { this.status = status; }
     public List<AstronautaDTO> getTripulacao() { return tripulacao; }
     public void setTripulacao(List<AstronautaDTO> tripulacao) { this.tripulacao = tripulacao; }
-    
     public EspaconaveDTO getEspaconave() { return espaconave; }
     public void setEspaconave(EspaconaveDTO espaconave) { this.espaconave = espaconave; }
-    
+    public OperadorDeMissaoDTO getOperadorResponsavel() { return operadorResponsavel; }
+    public void setOperadorResponsavel(OperadorDeMissaoDTO operadorResponsavel) { this.operadorResponsavel = operadorResponsavel; }
     public String getTipoSimulacao() { return tipoSimulacao; }
     public void setTipoSimulacao(String tipoSimulacao) { this.tipoSimulacao = tipoSimulacao; }
 }

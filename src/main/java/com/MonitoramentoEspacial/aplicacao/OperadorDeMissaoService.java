@@ -18,7 +18,7 @@ public class OperadorDeMissaoService implements OperadorDeMissaoServiceInterface
     private static final Logger log = LoggerFactory.getLogger(OperadorDeMissaoService.class);
 
     private final OperadorDeMissaoRepository repository;
-    private final OperadorDeMissaoMapper operadorMapper; // Injetado
+    private final OperadorDeMissaoMapper operadorMapper;
 
     public OperadorDeMissaoService(OperadorDeMissaoRepository repository, OperadorDeMissaoMapper operadorMapper) {
         this.repository = repository;
@@ -29,9 +29,23 @@ public class OperadorDeMissaoService implements OperadorDeMissaoServiceInterface
     @Transactional
     public OperadorDeMissaoDTO criarOperador(CriarOperadorRequest request) {
         log.info("Criando novo operador: {}", request.getNome());
-        // MODIFICADO: Usa o mapper
         OperadorDeMissao operador = operadorMapper.toEntity(request);
-        @SuppressWarnings("null")
+        OperadorDeMissao salvo = repository.save(operador);
+        return operadorMapper.toDTO(salvo);
+    }
+
+    @Override
+    @Transactional
+    public OperadorDeMissaoDTO atualizarOperador(Long id, CriarOperadorRequest request) {
+        OperadorDeMissao operador = repository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Operador nao encontrado com ID: " + id));
+
+        operador.setNome(request.getNome());
+        operador.setIdade(request.getIdade());
+        operador.setAtivo(Boolean.TRUE.equals(request.getAtivo()));
+        operador.setTurno(request.getTurno());
+        operador.setAreaEspecializacao(request.getAreaEspecializacao());
+
         OperadorDeMissao salvo = repository.save(operador);
         return operadorMapper.toDTO(salvo);
     }
@@ -39,9 +53,8 @@ public class OperadorDeMissaoService implements OperadorDeMissaoServiceInterface
     @Override
     @Transactional(readOnly = true)
     public OperadorDeMissaoDTO buscarPorId(Long id) {
-        @SuppressWarnings("null")
         OperadorDeMissao operador = repository.findById(id)
-            .orElseThrow(() -> new RecursoNaoEncontradoException("Operador não encontrado com ID: " + id));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Operador nao encontrado com ID: " + id));
         return operadorMapper.toDTO(operador);
     }
 
@@ -55,17 +68,16 @@ public class OperadorDeMissaoService implements OperadorDeMissaoServiceInterface
             operadores = repository.findAll();
         }
         return operadores.stream()
-            .map(operadorMapper::toDTO) // MODIFICADO: Usa o mapper
-            .collect(Collectors.toList());
+                .map(operadorMapper::toDTO)
+                .collect(Collectors.toList());
     }
 
-    @SuppressWarnings("null")
     @Override
     @Transactional
     public void deletarOperador(Long id) {
         log.info("Tentando deletar operador ID: {}", id);
         if (!repository.existsById(id)) {
-            throw new RecursoNaoEncontradoException("Operador não encontrado para exclusão (ID: " + id + ")");
+            throw new RecursoNaoEncontradoException("Operador nao encontrado para exclusao (ID: " + id + ")");
         }
         repository.deleteById(id);
         log.info("Operador ID: {} deletado com sucesso", id);
