@@ -26,6 +26,7 @@ services:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:-local}"
+      APP_DATASOURCE_PROVIDER: "${APP_DATASOURCE_PROVIDER:-local-postgres}"
       SPRING_DATASOURCE_URL: "${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/monitoramento_espacial}"
       SPRING_DATASOURCE_USERNAME: "${SPRING_DATASOURCE_USERNAME:-monitoramento}"
       SPRING_DATASOURCE_PASSWORD: "${SPRING_DATASOURCE_PASSWORD:-monitoramento_local_password}"
